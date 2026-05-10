@@ -1,5 +1,5 @@
 /* 书山 Service Worker — 离线缓存策略 */
-const CACHE_NAME = 'shushan-v1';
+const CACHE_NAME = 'shushan-v3';
 const ASSETS = [
   './',
   './index.html',

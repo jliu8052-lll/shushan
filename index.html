@@ -630,9 +630,9 @@
     position: absolute;
     left: 50%; top: 50%;
     transform: translate(-50%, -50%);
-    width: 80%;
-    max-width: 360px;
-    aspect-ratio: 3 / 1.6;
+    width: 88%;
+    max-width: 420px;
+    aspect-ratio: 4 / 3;
     border: 2px solid rgba(255,255,255,0.6);
     box-shadow: 0 0 0 9999px rgba(0,0,0,0.5);
     pointer-events: none;
@@ -928,7 +928,11 @@
     <video id="scannerVideo" playsinline muted></video>
     <div class="scanner-frame"><span></span></div>
     <div class="scanner-laser"></div>
-    <div class="scanner-hint">将书背条形码对准取景框</div>
+    <div class="scanner-hint">
+      <div>将条形码放入取景框</div>
+      <div style="font-size:12px;color:rgba(244,236,216,0.7);margin-top:4px;letter-spacing:0.05em;">距离书背 15–20cm · 保持稳定</div>
+      <div id="scannerStatus" style="font-size:11px;color:rgba(244,236,216,0.5);margin-top:8px;letter-spacing:0;"></div>
+    </div>
     <div class="scanner-error" id="scannerError" style="display:none;"></div>
   </div>
 </div>
@@ -1318,8 +1322,10 @@ $('#scannerClose').addEventListener('click', stopScanner);
 async function startScanner() {
   const overlay = $('#scannerOverlay');
   const errorBox = $('#scannerError');
+  const statusEl = $('#scannerStatus');
   errorBox.style.display = 'none';
   overlay.classList.add('open');
+  if (statusEl) statusEl.textContent = '初始化…';
 
   // 检查浏览器支持
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -1327,19 +1333,24 @@ async function startScanner() {
     return;
   }
   if (typeof ZXing === 'undefined') {
-    showScannerError('扫码库加载失败', '请检查网络后重试，或手动输入 ISBN。');
+    showScannerError('扫码库加载失败', '可能是网络问题导致 ZXing 没下载。请检查网络后强制刷新（长按刷新按钮）重试，或手动输入 ISBN。');
     return;
   }
 
   try {
-    // 获取摄像头流（优先后置）
+    // 获取摄像头流（优先后置 + 高分辨率，方便对小条形码识别）
     scanStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: 'environment' } },
+      video: {
+        facingMode: { ideal: 'environment' },
+        width: { ideal: 1920 },
+        height: { ideal: 1080 }
+      },
       audio: false
     });
     const video = $('#scannerVideo');
     video.srcObject = scanStream;
     await video.play();
+    if (statusEl) statusEl.textContent = '识别中… 让条形码占满画面宽度';
 
     // 启动 ZXing 解码
     const hints = new Map();
@@ -1349,35 +1360,49 @@ async function startScanner() {
       ZXing.BarcodeFormat.UPC_A,
       ZXing.BarcodeFormat.UPC_E,
       ZXing.BarcodeFormat.CODE_128,
+      ZXing.BarcodeFormat.CODE_39,
     ];
     hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
     hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
     codeReader = new ZXing.BrowserMultiFormatReader(hints);
 
+    let frameCount = 0;
+    let lastUiUpdate = Date.now();
     codeReader.decodeFromVideoElement(video, (result, err) => {
+      frameCount++;
+      // 每秒更新一次状态，让用户知道扫描确实在运行
+      const now = Date.now();
+      if (statusEl && now - lastUiUpdate > 1000) {
+        statusEl.textContent = `识别中… 已扫 ${frameCount} 帧（${Math.round(frameCount / ((now - scanStartTime) / 1000))} fps）`;
+        lastUiUpdate = now;
+      }
       if (result) {
         const text = result.getText();
-        // 简单校验：13 位（EAN-13）或 10 位
         const cleaned = text.replace(/[-\s]/g, '');
+        console.log('[扫码] 识别到:', text, '→', cleaned);
         if (/^\d{10}(\d{3})?$/.test(cleaned)) {
           onScanSuccess(cleaned);
+        } else if (statusEl) {
+          statusEl.textContent = `识别到 "${text}"，但不是有效 ISBN，继续扫…`;
+          lastUiUpdate = now + 1500; // 让这条消息留 1.5 秒
         }
-        // 不是 ISBN 就忽略，继续扫
       }
-      // err 大多数是「这一帧没识别到」，无视即可
     });
+    scanStartTime = Date.now();
   } catch (e) {
+    console.error('[扫码] 摄像头错误:', e);
     let msg = '请允许使用摄像头，并刷新页面重试。';
     if (e.name === 'NotAllowedError') {
-      msg = '摄像头权限被拒绝。请到浏览器设置里允许此网站使用摄像头，再刷新重试。';
+      msg = '摄像头权限被拒绝。iPhone 上请到「设置 → Safari → 摄像头」中允许此网站，或长按地址栏选「网站设置」→ 摄像头 → 允许。';
     } else if (e.name === 'NotFoundError') {
       msg = '未找到摄像头设备。';
     } else if (e.name === 'NotReadableError') {
-      msg = '摄像头被其他应用占用。';
+      msg = '摄像头被其他应用占用。请关闭其他用摄像头的 app 后重试。';
     }
     showScannerError('无法启动摄像头', msg);
   }
 }
+let scanStartTime = 0;
 
 function showScannerError(title, msg) {
   const errorBox = $('#scannerError');
