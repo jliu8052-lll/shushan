@@ -16,7 +16,6 @@
 <meta name="mobile-web-app-capable" content="yes">
 
 <title>书山 · 藏书录</title>
-<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <style>
   /* ============== 字体 ============== */
   @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;500;600;700&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,400&display=swap');
@@ -545,165 +544,25 @@
   .fetch-status.error { color: var(--vermilion); }
   .fetch-status.success { color: var(--celadon); }
 
-  /* 扫码按钮 */
-  .scan-btn {
-    padding: 8px 12px;
-    border: 1px solid var(--celadon);
-    background: var(--paper);
-    color: var(--celadon);
-    font-family: var(--serif-zh);
+  /* iPhone 实时文本提示 */
+  .fetch-tip {
+    margin-bottom: 18px;
+    padding: 10px 14px;
+    background: rgba(154, 123, 58, 0.08);
+    border-left: 3px solid var(--gold);
     font-size: 13px;
-    cursor: pointer;
-    letter-spacing: 0.1em;
-    transition: all .2s;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-  }
-  .scan-btn:hover { background: var(--celadon); color: var(--paper); }
-  .scan-btn .scan-icon {
-    display: inline-block;
-    width: 14px; height: 14px;
-    border: 2px solid currentColor;
-    position: relative;
-  }
-  .scan-btn .scan-icon::before,
-  .scan-btn .scan-icon::after {
-    content: '';
-    position: absolute;
-    background: currentColor;
-  }
-  .scan-btn .scan-icon::before {
-    left: 1px; right: 1px;
-    top: 50%; height: 2px;
-    transform: translateY(-50%);
-  }
-
-  /* 扫码弹窗 */
-  .scanner-overlay {
-    position: fixed;
-    inset: 0;
-    background: #000;
-    z-index: 200;
-    display: none;
-    flex-direction: column;
-  }
-  .scanner-overlay.open { display: flex; }
-  .scanner-head {
-    padding: 16px 20px;
-    background: rgba(0,0,0,0.85);
-    color: var(--paper);
+    color: var(--ink-soft);
+    line-height: 1.6;
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    z-index: 2;
+    align-items: flex-start;
+    gap: 10px;
   }
-  .scanner-title {
-    font-family: var(--serif-zh);
+  .fetch-tip-icon {
     font-size: 16px;
-    letter-spacing: 0.15em;
+    flex-shrink: 0;
+    margin-top: 1px;
   }
-  .scanner-close {
-    background: transparent;
-    border: 1px solid var(--paper);
-    color: var(--paper);
-    padding: 6px 16px;
-    font-family: var(--serif-zh);
-    font-size: 13px;
-    cursor: pointer;
-    letter-spacing: 0.1em;
-  }
-  .scanner-video-wrap {
-    flex: 1;
-    position: relative;
-    overflow: hidden;
-    background: #000;
-  }
-  #scannerVideo {
-    width: 100%;
-    height: 100%;
-    display: block;
-  }
-  #scannerVideo video {
-    width: 100% !important;
-    height: 100% !important;
-    object-fit: cover !important;
-    display: block;
-  }
-  /* 取景框 */
-  .scanner-frame {
-    position: absolute;
-    left: 50%; top: 50%;
-    transform: translate(-50%, -50%);
-    width: 88%;
-    max-width: 420px;
-    aspect-ratio: 4 / 3;
-    border: 2px solid rgba(255,255,255,0.6);
-    box-shadow: 0 0 0 9999px rgba(0,0,0,0.5);
-    pointer-events: none;
-  }
-  .scanner-frame::before, .scanner-frame::after,
-  .scanner-frame > span::before, .scanner-frame > span::after {
-    content: '';
-    position: absolute;
-    width: 22px; height: 22px;
-    border: 3px solid var(--vermilion);
-  }
-  .scanner-frame::before { top: -3px; left: -3px; border-right: none; border-bottom: none; }
-  .scanner-frame::after { top: -3px; right: -3px; border-left: none; border-bottom: none; }
-  .scanner-frame > span::before { bottom: -3px; left: -3px; border-right: none; border-top: none; }
-  .scanner-frame > span::after { bottom: -3px; right: -3px; border-left: none; border-top: none; }
-
-  .scanner-laser {
-    position: absolute;
-    left: 0; right: 0;
-    height: 2px;
-    background: var(--vermilion);
-    box-shadow: 0 0 8px var(--vermilion);
-    animation: laser 2s ease-in-out infinite;
-  }
-  @keyframes laser {
-    0%, 100% { top: 10%; }
-    50% { top: 90%; }
-  }
-
-  .scanner-hint {
-    position: absolute;
-    bottom: 32px;
-    left: 0; right: 0;
-    text-align: center;
-    color: var(--paper);
-    font-family: var(--serif-zh);
-    font-size: 14px;
-    letter-spacing: 0.15em;
-    text-shadow: 0 1px 4px rgba(0,0,0,0.8);
-    z-index: 2;
-  }
-  .scanner-error {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    color: var(--paper);
-    text-align: center;
-    padding: 40px;
-    background: rgba(0,0,0,0.9);
-    font-family: var(--serif-zh);
-  }
-  .scanner-error h3 {
-    font-size: 20px;
-    margin-bottom: 12px;
-    color: var(--vermilion-soft);
-  }
-  .scanner-error p {
-    font-size: 14px;
-    line-height: 1.7;
-    color: rgba(244, 236, 216, 0.85);
-    max-width: 320px;
-    margin-bottom: 16px;
-  }
+  .fetch-tip b { color: var(--vermilion); font-weight: 500; }
 
   /* ============== 详情视图 ============== */
   .detail-grid {
@@ -845,9 +704,12 @@
     </div>
     <div class="modal-body">
       <div class="fetch-bar">
-        <input type="text" id="fetchInput" placeholder="输入 ISBN 或书名，自动从 Google Books 拉取">
-        <button class="scan-btn" id="scanBtn" title="扫描 ISBN 条形码"><span class="scan-icon"></span>扫码</button>
+        <input type="text" id="fetchInput" placeholder="输入 ISBN 或书名">
         <button class="btn" id="fetchBtn">查询</button>
+      </div>
+      <div class="fetch-tip">
+        <span class="fetch-tip-icon">📷</span>
+        <span>iPhone 用户可用<b>系统相机</b>对准书背 ISBN 数字，长按识别后复制粘贴到上方</span>
       </div>
       <div class="fetch-status" id="fetchStatus"></div>
       <form class="form-grid" id="bookForm" onsubmit="return false">
@@ -922,25 +784,6 @@
 </div>
 
 <input type="file" id="importFile" accept=".json" style="display:none;">
-
-<!-- 扫码弹窗 -->
-<div class="scanner-overlay" id="scannerOverlay">
-  <div class="scanner-head">
-    <div class="scanner-title">扫描 ISBN 条形码</div>
-    <button class="scanner-close" id="scannerClose">关闭</button>
-  </div>
-  <div class="scanner-video-wrap">
-    <div id="scannerVideo" style="width:100%;height:100%;"></div>
-    <div class="scanner-frame"><span></span></div>
-    <div class="scanner-laser"></div>
-    <div class="scanner-hint">
-      <div>将条形码放入取景框</div>
-      <div style="font-size:12px;color:rgba(244,236,216,0.7);margin-top:4px;letter-spacing:0.05em;">距离书背 15–20cm · 保持稳定</div>
-      <div id="scannerStatus" style="font-size:11px;color:rgba(244,236,216,0.5);margin-top:8px;letter-spacing:0;"></div>
-    </div>
-    <div class="scanner-error" id="scannerError" style="display:none;"></div>
-  </div>
-</div>
 
 <div class="toast" id="toast"></div>
 
@@ -1316,149 +1159,6 @@ async function fetchFromGoogleBooks() {
 }
 
 /* ===========================================================
-   扫码（html5-qrcode）
-   =========================================================== */
-let html5Qr = null;
-
-$('#scanBtn').addEventListener('click', startScanner);
-$('#scannerClose').addEventListener('click', stopScanner);
-
-async function startScanner() {
-  const overlay = $('#scannerOverlay');
-  const errorBox = $('#scannerError');
-  const statusEl = $('#scannerStatus');
-  errorBox.style.display = 'none';
-  overlay.classList.add('open');
-
-  const dbg = (msg) => {
-    if (statusEl) {
-      statusEl.textContent = msg;
-      statusEl.style.color = 'rgba(244,236,216,0.95)';
-      statusEl.style.fontSize = '12px';
-    }
-    console.log('[扫码]', msg);
-  };
-
-  dbg('① 检查浏览器支持…');
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    showScannerError('此浏览器不支持摄像头', '请用 Safari 或 Chrome。');
-    return;
-  }
-
-  dbg('② 检查扫码库…');
-  if (typeof Html5Qrcode === 'undefined') {
-    showScannerError('扫码库加载失败', '请检查网络后强制刷新重试。');
-    return;
-  }
-  dbg('✅ 扫码库已加载');
-
-  try {
-    dbg('③ 初始化扫描器…');
-    const formats = (typeof Html5QrcodeSupportedFormats !== 'undefined') ? [
-      Html5QrcodeSupportedFormats.EAN_13,
-      Html5QrcodeSupportedFormats.EAN_8,
-      Html5QrcodeSupportedFormats.UPC_A,
-      Html5QrcodeSupportedFormats.UPC_E,
-      Html5QrcodeSupportedFormats.CODE_128,
-      Html5QrcodeSupportedFormats.CODE_39,
-    ] : undefined;
-
-    html5Qr = new Html5Qrcode('scannerVideo', {
-      formatsToSupport: formats,
-      verbose: false
-    });
-
-    dbg('④ 启动摄像头…');
-    let attempts = 0;
-    scanStartTime = Date.now();
-    let lastUiUpdate = Date.now();
-
-    await html5Qr.start(
-      { facingMode: 'environment' },
-      {
-        fps: 10,
-        qrbox: function(viewW, viewH) {
-          // 取景框宽 80%，高度按 4:3
-          const w = Math.floor(viewW * 0.85);
-          const h = Math.floor(w * 0.55);
-          return { width: w, height: Math.min(h, viewH * 0.6) };
-        },
-        aspectRatio: undefined,
-        disableFlip: false,
-        videoConstraints: {
-          facingMode: 'environment',
-          width: { ideal: 1920 },
-          height: { ideal: 1080 }
-        }
-      },
-      (decodedText) => {
-        const cleaned = decodedText.replace(/[-\s]/g, '');
-        dbg('✅ 识别到: ' + decodedText);
-        if (/^\d{10}(\d{3})?$/.test(cleaned)) {
-          onScanSuccess(cleaned);
-        }
-      },
-      (errMsg) => {
-        // 每帧扫描失败的回调，用作心跳
-        attempts++;
-        const now = Date.now();
-        if (now - lastUiUpdate > 800) {
-          const seconds = (now - scanStartTime) / 1000;
-          dbg(`⏳ 扫描中… 已尝试 ${attempts} 次（${(attempts/seconds).toFixed(1)}/秒）`);
-          lastUiUpdate = now;
-        }
-      }
-    );
-    dbg('⑤ 扫描已启动，对准条形码…');
-  } catch (e) {
-    console.error('[扫码] 启动错误:', e);
-    let msg = '请允许使用摄像头并刷新重试。';
-    const eStr = String(e.message || e);
-    if (eStr.includes('Permission') || eStr.includes('NotAllowed') || eStr.includes('denied')) {
-      msg = '摄像头权限被拒绝。\nMac：Safari → 设置 → 网站 → 摄像头 → 允许\niPhone：设置 → Safari → 摄像头 → 允许';
-    } else if (eStr.includes('NotFound')) {
-      msg = '未找到摄像头设备。';
-    } else if (eStr.includes('NotReadable')) {
-      msg = '摄像头被其他应用占用。';
-    } else {
-      msg += '\n详细：' + eStr.slice(0, 200);
-    }
-    showScannerError('无法启动摄像头', msg);
-  }
-}
-let scanStartTime = 0;
-
-function showScannerError(title, msg) {
-  const errorBox = $('#scannerError');
-  errorBox.innerHTML = `<h3>${title}</h3><p>${msg}</p><button class="scanner-close" onclick="stopScanner()">返回</button>`;
-  errorBox.style.display = 'flex';
-}
-
-function onScanSuccess(isbn) {
-  // 短促振动反馈（如果支持）
-  if (navigator.vibrate) navigator.vibrate(80);
-  stopScanner();
-  // 填入查询框并自动查询
-  $('#fetchInput').value = isbn;
-  toast('已扫到：' + isbn);
-  fetchFromGoogleBooks();
-}
-
-function stopScanner() {
-  $('#scannerOverlay').classList.remove('open');
-  if (html5Qr) {
-    html5Qr.stop().then(() => {
-      try { html5Qr.clear(); } catch (e) {}
-      html5Qr = null;
-    }).catch(() => {
-      try { html5Qr.clear(); } catch (e) {}
-      html5Qr = null;
-    });
-  }
-}
-window.stopScanner = stopScanner;
-
-/* ===========================================================
    弹窗控制
    =========================================================== */
 function openOverlay(id) { $('#' + id).classList.add('open'); }
@@ -1472,7 +1172,6 @@ document.querySelectorAll('.overlay').forEach(o => {
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     document.querySelectorAll('.overlay.open').forEach(o => o.classList.remove('open'));
-    if ($('#scannerOverlay').classList.contains('open')) stopScanner();
     $('#menu').classList.remove('open');
   }
 });
