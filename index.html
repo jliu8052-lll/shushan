@@ -16,7 +16,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 
 <title>书山 · 藏书录</title>
-<script src="https://unpkg.com/@zxing/library@0.21.0/umd/index.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <style>
   /* ============== 字体 ============== */
   @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;500;600;700&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,400&display=swap');
@@ -622,7 +622,12 @@
   #scannerVideo {
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    display: block;
+  }
+  #scannerVideo video {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
     display: block;
   }
   /* 取景框 */
@@ -925,7 +930,7 @@
     <button class="scanner-close" id="scannerClose">关闭</button>
   </div>
   <div class="scanner-video-wrap">
-    <video id="scannerVideo" playsinline muted></video>
+    <div id="scannerVideo" style="width:100%;height:100%;"></div>
     <div class="scanner-frame"><span></span></div>
     <div class="scanner-laser"></div>
     <div class="scanner-hint">
@@ -1311,10 +1316,9 @@ async function fetchFromGoogleBooks() {
 }
 
 /* ===========================================================
-   扫码（ZXing）
+   扫码（html5-qrcode）
    =========================================================== */
-let codeReader = null;
-let scanStream = null;
+let html5Qr = null;
 
 $('#scanBtn').addEventListener('click', startScanner);
 $('#scannerClose').addEventListener('click', stopScanner);
@@ -1337,76 +1341,93 @@ async function startScanner() {
 
   dbg('① 检查浏览器支持…');
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    showScannerError('此浏览器不支持摄像头', '请用 Safari（iOS）或 Chrome（Android）。');
+    showScannerError('此浏览器不支持摄像头', '请用 Safari 或 Chrome。');
     return;
   }
 
-  dbg('② 检查 ZXing 库…');
-  if (typeof ZXing === 'undefined') {
-    dbg('❌ ZXing 未定义');
-    showScannerError('扫码库加载失败', '可能是网络问题。请检查网络后强制刷新重试。');
+  dbg('② 检查扫码库…');
+  if (typeof Html5Qrcode === 'undefined') {
+    showScannerError('扫码库加载失败', '请检查网络后强制刷新重试。');
     return;
   }
-  dbg('✅ ZXing 已加载');
+  dbg('✅ 扫码库已加载');
 
   try {
-    dbg('③ 请求摄像头权限…');
-    scanStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
-      audio: false
+    dbg('③ 初始化扫描器…');
+    const formats = (typeof Html5QrcodeSupportedFormats !== 'undefined') ? [
+      Html5QrcodeSupportedFormats.EAN_13,
+      Html5QrcodeSupportedFormats.EAN_8,
+      Html5QrcodeSupportedFormats.UPC_A,
+      Html5QrcodeSupportedFormats.UPC_E,
+      Html5QrcodeSupportedFormats.CODE_128,
+      Html5QrcodeSupportedFormats.CODE_39,
+    ] : undefined;
+
+    html5Qr = new Html5Qrcode('scannerVideo', {
+      formatsToSupport: formats,
+      verbose: false
     });
-    dbg('④ 摄像头开启…');
 
-    const video = $('#scannerVideo');
-    video.srcObject = scanStream;
-    await video.play();
-    dbg('⑤ 视频流播放中，初始化 ZXing…');
-
-    const hints = new Map();
-    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
-      ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.EAN_8,
-      ZXing.BarcodeFormat.UPC_A, ZXing.BarcodeFormat.UPC_E,
-      ZXing.BarcodeFormat.CODE_128, ZXing.BarcodeFormat.CODE_39
-    ]);
-    hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
-
-    if (!ZXing.BrowserMultiFormatReader) {
-      dbg('❌ ZXing.BrowserMultiFormatReader 不存在');
-      return;
-    }
-    codeReader = new ZXing.BrowserMultiFormatReader(hints);
-    dbg('⑥ ZXing 初始化完成');
-
-    let frameCount = 0;
+    dbg('④ 启动摄像头…');
+    let attempts = 0;
     scanStartTime = Date.now();
     let lastUiUpdate = Date.now();
 
-    codeReader.decodeFromVideoElement(video, (result, err) => {
-      frameCount++;
-      const now = Date.now();
-      if (now - lastUiUpdate > 800) {
-        const seconds = (now - scanStartTime) / 1000;
-        dbg(`⏳ 已扫 ${frameCount} 帧 / ${seconds.toFixed(1)}秒 (${(frameCount/seconds).toFixed(1)} fps)`);
-        lastUiUpdate = now;
+    await html5Qr.start(
+      { facingMode: 'environment' },
+      {
+        fps: 10,
+        qrbox: function(viewW, viewH) {
+          // 取景框宽 80%，高度按 4:3
+          const w = Math.floor(viewW * 0.85);
+          const h = Math.floor(w * 0.55);
+          return { width: w, height: Math.min(h, viewH * 0.6) };
+        },
+        aspectRatio: undefined,
+        disableFlip: false,
+        videoConstraints: {
+          facingMode: 'environment',
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
+        }
+      },
+      (decodedText) => {
+        const cleaned = decodedText.replace(/[-\s]/g, '');
+        dbg('✅ 识别到: ' + decodedText);
+        if (/^\d{10}(\d{3})?$/.test(cleaned)) {
+          onScanSuccess(cleaned);
+        }
+      },
+      (errMsg) => {
+        // 每帧扫描失败的回调，用作心跳
+        attempts++;
+        const now = Date.now();
+        if (now - lastUiUpdate > 800) {
+          const seconds = (now - scanStartTime) / 1000;
+          dbg(`⏳ 扫描中… 已尝试 ${attempts} 次（${(attempts/seconds).toFixed(1)}/秒）`);
+          lastUiUpdate = now;
+        }
       }
-      if (result) {
-        const text = result.getText();
-        const cleaned = text.replace(/[-\s]/g, '');
-        dbg('✅ 识别到: ' + text);
-        if (/^\d{10}(\d{3})?$/.test(cleaned)) onScanSuccess(cleaned);
-      }
-    });
-    dbg('⑦ 扫描已启动，对准条形码…');
+    );
+    dbg('⑤ 扫描已启动，对准条形码…');
   } catch (e) {
-    dbg('❌ 出错: ' + (e.name || '') + ' / ' + (e.message || ''));
+    console.error('[扫码] 启动错误:', e);
     let msg = '请允许使用摄像头并刷新重试。';
-    if (e.name === 'NotAllowedError') msg = '摄像头权限被拒绝。设置 → Safari → 摄像头 中允许此站。';
-    else if (e.name === 'NotFoundError') msg = '未找到摄像头设备。';
-    else if (e.name === 'NotReadableError') msg = '摄像头被其他应用占用。';
+    const eStr = String(e.message || e);
+    if (eStr.includes('Permission') || eStr.includes('NotAllowed') || eStr.includes('denied')) {
+      msg = '摄像头权限被拒绝。\nMac：Safari → 设置 → 网站 → 摄像头 → 允许\niPhone：设置 → Safari → 摄像头 → 允许';
+    } else if (eStr.includes('NotFound')) {
+      msg = '未找到摄像头设备。';
+    } else if (eStr.includes('NotReadable')) {
+      msg = '摄像头被其他应用占用。';
+    } else {
+      msg += '\n详细：' + eStr.slice(0, 200);
+    }
     showScannerError('无法启动摄像头', msg);
   }
 }
 let scanStartTime = 0;
+
 function showScannerError(title, msg) {
   const errorBox = $('#scannerError');
   errorBox.innerHTML = `<h3>${title}</h3><p>${msg}</p><button class="scanner-close" onclick="stopScanner()">返回</button>`;
@@ -1425,13 +1446,14 @@ function onScanSuccess(isbn) {
 
 function stopScanner() {
   $('#scannerOverlay').classList.remove('open');
-  if (codeReader) {
-    try { codeReader.reset(); } catch (e) {}
-    codeReader = null;
-  }
-  if (scanStream) {
-    scanStream.getTracks().forEach(t => t.stop());
-    scanStream = null;
+  if (html5Qr) {
+    html5Qr.stop().then(() => {
+      try { html5Qr.clear(); } catch (e) {}
+      html5Qr = null;
+    }).catch(() => {
+      try { html5Qr.clear(); } catch (e) {}
+      html5Qr = null;
+    });
   }
 }
 window.stopScanner = stopScanner;
@@ -1639,30 +1661,22 @@ function toast(msg) {
   render();
 })();
 
-/* PWA: 注册 service worker
-   注意：先清掉旧的 sw 和所有 cache，避免老版本卡住不更新 */
+/* PWA: 暂时禁用 service worker，避免老缓存卡住更新
+   等扫码功能稳定后再恢复 */
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', async () => {
-    try {
-      // 1. 检查现有的 sw 注册
-      const regs = await navigator.serviceWorker.getRegistrations();
-      // 2. 强制清除所有旧缓存（拿到的都不是最新 CACHE_NAME 的也清）
-      const cacheNames = await caches.keys();
-      const validCache = 'shushan-v3';
-      for (const name of cacheNames) {
-        if (name !== validCache) {
-          await caches.delete(name);
-          console.log('[SW] 清除旧缓存:', name);
-        }
-      }
-      // 3. 注册新 sw（存在的话会自动检查更新）
-      const reg = await navigator.serviceWorker.register('sw.js');
-      // 4. 主动检查更新
-      reg.update();
-    } catch (err) {
-      console.warn('Service worker 注册失败：', err);
+  navigator.serviceWorker.getRegistrations().then(regs => {
+    for (const reg of regs) {
+      reg.unregister().then(ok => {
+        if (ok) console.log('[SW] 已卸载旧 service worker');
+      });
     }
   });
+  // 同时清空所有缓存
+  if (window.caches) {
+    caches.keys().then(keys => {
+      keys.forEach(k => caches.delete(k).then(() => console.log('[Cache] 已清:', k)));
+    });
+  }
 }
 </script>
 </body>
