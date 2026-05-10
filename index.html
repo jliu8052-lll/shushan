@@ -1325,20 +1325,34 @@ async function startScanner() {
   const statusEl = $('#scannerStatus');
   errorBox.style.display = 'none';
   overlay.classList.add('open');
-  if (statusEl) statusEl.textContent = '初始化…';
 
-  // 检查浏览器支持
+  // 调试日志：把每一步都显示到屏幕上
+  const dbg = (msg) => {
+    if (statusEl) {
+      const old = statusEl.textContent;
+      statusEl.textContent = msg;
+      statusEl.style.color = 'rgba(244,236,216,0.95)';
+      statusEl.style.fontSize = '12px';
+      console.log('[扫码]', msg);
+    }
+  };
+
+  dbg('① 检查浏览器支持…');
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     showScannerError('此浏览器不支持摄像头', '请用 Safari（iOS）或 Chrome（Android）打开本页面。');
     return;
   }
+
+  dbg('② 检查 ZXing 库…');
   if (typeof ZXing === 'undefined') {
+    dbg('❌ ZXing 未定义 — 库未加载');
     showScannerError('扫码库加载失败', '可能是网络问题导致 ZXing 没下载。请检查网络后强制刷新（长按刷新按钮）重试，或手动输入 ISBN。');
     return;
   }
+  dbg('✅ ZXing 已加载');
 
   try {
-    // 获取摄像头流（优先后置 + 高分辨率，方便对小条形码识别）
+    dbg('③ 请求摄像头权限…');
     scanStream = await navigator.mediaDevices.getUserMedia({
       video: {
         facingMode: { ideal: 'environment' },
@@ -1347,12 +1361,13 @@ async function startScanner() {
       },
       audio: false
     });
+    dbg('④ 摄像头已开启，启动视频流…');
+
     const video = $('#scannerVideo');
     video.srcObject = scanStream;
     await video.play();
-    if (statusEl) statusEl.textContent = '识别中… 让条形码占满画面宽度';
+    dbg('⑤ 视频流播放中，初始化 ZXing…');
 
-    // 启动 ZXing 解码
     const hints = new Map();
     const formats = [
       ZXing.BarcodeFormat.EAN_13,
@@ -1364,40 +1379,46 @@ async function startScanner() {
     ];
     hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
     hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+
+    if (!ZXing.BrowserMultiFormatReader) {
+      dbg('❌ ZXing.BrowserMultiFormatReader 不存在');
+      return;
+    }
     codeReader = new ZXing.BrowserMultiFormatReader(hints);
+    dbg('⑥ ZXing 初始化完成，开始扫描…');
 
     let frameCount = 0;
+    scanStartTime = Date.now();
     let lastUiUpdate = Date.now();
+
     codeReader.decodeFromVideoElement(video, (result, err) => {
       frameCount++;
-      // 每秒更新一次状态，让用户知道扫描确实在运行
       const now = Date.now();
-      if (statusEl && now - lastUiUpdate > 1000) {
-        statusEl.textContent = `识别中… 已扫 ${frameCount} 帧（${Math.round(frameCount / ((now - scanStartTime) / 1000))} fps）`;
+      if (now - lastUiUpdate > 800) {
+        const seconds = (now - scanStartTime) / 1000;
+        const fps = (frameCount / seconds).toFixed(1);
+        dbg(`⏳ 已扫 ${frameCount} 帧 / ${seconds.toFixed(1)}秒 (${fps} fps)`);
         lastUiUpdate = now;
       }
       if (result) {
         const text = result.getText();
         const cleaned = text.replace(/[-\s]/g, '');
-        console.log('[扫码] 识别到:', text, '→', cleaned);
+        dbg('✅ 识别到: ' + text);
         if (/^\d{10}(\d{3})?$/.test(cleaned)) {
           onScanSuccess(cleaned);
-        } else if (statusEl) {
-          statusEl.textContent = `识别到 "${text}"，但不是有效 ISBN，继续扫…`;
-          lastUiUpdate = now + 1500; // 让这条消息留 1.5 秒
         }
       }
     });
-    scanStartTime = Date.now();
+    dbg('⑦ 扫描已启动，对准条形码…');
   } catch (e) {
-    console.error('[扫码] 摄像头错误:', e);
+    dbg('❌ 出错: ' + (e.name || '') + ' / ' + (e.message || ''));
     let msg = '请允许使用摄像头，并刷新页面重试。';
     if (e.name === 'NotAllowedError') {
-      msg = '摄像头权限被拒绝。iPhone 上请到「设置 → Safari → 摄像头」中允许此网站，或长按地址栏选「网站设置」→ 摄像头 → 允许。';
+      msg = '摄像头权限被拒绝。iPhone 上请到「设置 → Safari → 摄像头」中允许此网站。';
     } else if (e.name === 'NotFoundError') {
       msg = '未找到摄像头设备。';
     } else if (e.name === 'NotReadableError') {
-      msg = '摄像头被其他应用占用。请关闭其他用摄像头的 app 后重试。';
+      msg = '摄像头被其他应用占用。';
     }
     showScannerError('无法启动摄像头', msg);
   }
@@ -1636,12 +1657,29 @@ function toast(msg) {
   render();
 })();
 
-/* PWA: 注册 service worker */
+/* PWA: 注册 service worker
+   注意：先清掉旧的 sw 和所有 cache，避免老版本卡住不更新 */
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').catch(err => {
+  window.addEventListener('load', async () => {
+    try {
+      // 1. 检查现有的 sw 注册
+      const regs = await navigator.serviceWorker.getRegistrations();
+      // 2. 强制清除所有旧缓存（拿到的都不是最新 CACHE_NAME 的也清）
+      const cacheNames = await caches.keys();
+      const validCache = 'shushan-v3';
+      for (const name of cacheNames) {
+        if (name !== validCache) {
+          await caches.delete(name);
+          console.log('[SW] 清除旧缓存:', name);
+        }
+      }
+      // 3. 注册新 sw（存在的话会自动检查更新）
+      const reg = await navigator.serviceWorker.register('sw.js');
+      // 4. 主动检查更新
+      reg.update();
+    } catch (err) {
       console.warn('Service worker 注册失败：', err);
-    });
+    }
   });
 }
 </script>
