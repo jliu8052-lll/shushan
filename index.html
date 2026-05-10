@@ -1,0 +1,1624 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#a8443a">
+<meta name="description" content="书山 · 个人藏书录">
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="书山">
+<meta name="mobile-web-app-capable" content="yes">
+
+<title>书山 · 藏书录</title>
+<script src="https://unpkg.com/@zxing/library@0.21.0/umd/index.min.js"></script>
+<style>
+  /* ============== 字体 ============== */
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;500;600;700&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,400&display=swap');
+
+  /* ============== 设计变量 ============== */
+  :root {
+    --paper: #f4ecd8;
+    --paper-deep: #ebe1c8;
+    --paper-shadow: #d9cfb6;
+    --ink: #2a2520;
+    --ink-soft: #5c544a;
+    --ink-faint: #8a8276;
+    --vermilion: #a8443a;       /* 朱砂 */
+    --vermilion-soft: #b85a4f;
+    --celadon: #6b7d6e;          /* 青瓷 */
+    --gold: #9a7b3a;
+    --line: #c9bfa5;
+    --line-soft: #ddd2b8;
+
+    --serif-zh: 'Noto Serif SC', 'Songti SC', 'STSong', 'SimSun', serif;
+    --serif-en: 'Cormorant Garamond', 'EB Garamond', Georgia, serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--serif-zh);
+    font-size: 16px;
+    line-height: 1.7;
+    min-height: 100vh;
+    /* 纸张纹理 */
+    background-image:
+      radial-gradient(circle at 20% 30%, rgba(154, 123, 58, 0.04) 0%, transparent 40%),
+      radial-gradient(circle at 80% 70%, rgba(168, 68, 58, 0.03) 0%, transparent 40%),
+      repeating-linear-gradient(
+        90deg,
+        transparent 0px,
+        transparent 2px,
+        rgba(74, 60, 40, 0.012) 2px,
+        rgba(74, 60, 40, 0.012) 3px
+      );
+  }
+
+  /* ============== 顶栏 ============== */
+  header {
+    border-bottom: 1px solid var(--line);
+    padding: 28px 48px 24px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 32px;
+    flex-wrap: wrap;
+    background: linear-gradient(180deg, var(--paper) 0%, var(--paper-deep) 100%);
+    position: relative;
+  }
+  header::after {
+    content: '';
+    position: absolute;
+    left: 48px; right: 48px; bottom: -4px;
+    height: 1px;
+    background: var(--line-soft);
+  }
+
+  .brand {
+    display: flex;
+    align-items: baseline;
+    gap: 18px;
+  }
+  .brand-mark {
+    font-family: var(--serif-zh);
+    font-size: 38px;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    color: var(--ink);
+    position: relative;
+  }
+  .brand-mark::before {
+    content: '';
+    position: absolute;
+    left: -14px; top: 8px;
+    width: 4px; height: 32px;
+    background: var(--vermilion);
+  }
+  .brand-sub {
+    font-family: var(--serif-en);
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink-soft);
+    letter-spacing: 0.05em;
+  }
+  .brand-meta {
+    font-size: 12px;
+    color: var(--ink-faint);
+    letter-spacing: 0.2em;
+    margin-left: 8px;
+    border-left: 1px solid var(--line);
+    padding-left: 14px;
+  }
+
+  /* ============== 顶栏右侧操作 ============== */
+  .header-tools {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .search-wrap {
+    position: relative;
+  }
+  .search {
+    width: 240px;
+    padding: 8px 14px 8px 34px;
+    border: 1px solid var(--line);
+    background: rgba(255, 252, 244, 0.6);
+    color: var(--ink);
+    font-family: var(--serif-zh);
+    font-size: 14px;
+    outline: none;
+    transition: all .25s ease;
+  }
+  .search:focus {
+    border-color: var(--vermilion);
+    background: rgba(255, 252, 244, 0.95);
+  }
+  .search::placeholder { color: var(--ink-faint); font-style: italic; }
+  .search-icon {
+    position: absolute;
+    left: 11px; top: 50%;
+    transform: translateY(-50%);
+    color: var(--ink-faint);
+    font-size: 14px;
+    pointer-events: none;
+  }
+
+  .view-toggle {
+    display: flex;
+    border: 1px solid var(--line);
+  }
+  .view-toggle button {
+    padding: 8px 14px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-family: var(--serif-zh);
+    font-size: 13px;
+    color: var(--ink-soft);
+    letter-spacing: 0.1em;
+    transition: all .2s;
+  }
+  .view-toggle button.active {
+    background: var(--ink);
+    color: var(--paper);
+  }
+  .view-toggle button:not(.active):hover {
+    background: rgba(0,0,0,0.04);
+  }
+
+  .btn {
+    padding: 8px 18px;
+    border: 1px solid var(--ink);
+    background: transparent;
+    color: var(--ink);
+    font-family: var(--serif-zh);
+    font-size: 13px;
+    letter-spacing: 0.15em;
+    cursor: pointer;
+    transition: all .2s;
+  }
+  .btn:hover { background: var(--ink); color: var(--paper); }
+  .btn-primary {
+    background: var(--vermilion);
+    border-color: var(--vermilion);
+    color: var(--paper);
+  }
+  .btn-primary:hover {
+    background: var(--ink);
+    border-color: var(--ink);
+  }
+  .btn-ghost {
+    border-color: var(--line);
+    color: var(--ink-soft);
+  }
+  .btn-ghost:hover { background: var(--paper-deep); color: var(--ink); border-color: var(--ink-soft); }
+
+  /* ============== 菜单（导出/导入/etc） ============== */
+  .menu-wrap { position: relative; }
+  .menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    background: var(--paper);
+    border: 1px solid var(--ink-soft);
+    min-width: 180px;
+    z-index: 50;
+    box-shadow: 4px 4px 0 rgba(42, 37, 32, 0.08);
+    display: none;
+  }
+  .menu.open { display: block; }
+  .menu button {
+    display: block;
+    width: 100%;
+    padding: 10px 16px;
+    background: transparent;
+    border: none;
+    text-align: left;
+    font-family: var(--serif-zh);
+    font-size: 13px;
+    color: var(--ink);
+    cursor: pointer;
+    border-bottom: 1px solid var(--line-soft);
+    letter-spacing: 0.08em;
+  }
+  .menu button:last-child { border-bottom: none; }
+  .menu button:hover { background: var(--paper-deep); color: var(--vermilion); }
+
+  /* ============== 主区域 ============== */
+  main {
+    padding: 48px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  .stats-bar {
+    display: flex;
+    align-items: baseline;
+    gap: 24px;
+    margin-bottom: 32px;
+    color: var(--ink-soft);
+    font-family: var(--serif-en);
+    font-size: 14px;
+    font-style: italic;
+  }
+  .stats-count {
+    font-family: var(--serif-zh);
+    font-style: normal;
+    color: var(--ink);
+    font-size: 18px;
+    font-weight: 500;
+  }
+  .stats-count strong {
+    font-size: 28px;
+    color: var(--vermilion);
+    font-weight: 600;
+    margin-right: 4px;
+  }
+
+  /* ============== 网格视图 ============== */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 36px 28px;
+  }
+  .book-card {
+    cursor: pointer;
+    transition: transform .25s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+  .book-card:hover { transform: translateY(-4px); }
+  .book-cover {
+    width: 100%;
+    aspect-ratio: 2 / 3;
+    background: linear-gradient(135deg, #c0a878 0%, #8a6f3f 100%);
+    margin-bottom: 14px;
+    box-shadow:
+      0 1px 2px rgba(0,0,0,0.1),
+      6px 6px 16px rgba(42, 37, 32, 0.18),
+      inset -2px 0 8px rgba(0,0,0,0.15),
+      inset 2px 0 4px rgba(255,255,255,0.1);
+    position: relative;
+    overflow: hidden;
+  }
+  .book-cover img {
+    width: 100%; height: 100%; object-fit: cover;
+    display: block;
+  }
+  /* 无封面时的样式 */
+  .book-cover.no-image {
+    background:
+      linear-gradient(170deg, rgba(255,255,255,0.08) 0%, rgba(0,0,0,0.15) 100%),
+      linear-gradient(135deg, #6b7d6e 0%, #4a5a4d 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+  .book-cover.no-image .placeholder-title {
+    font-family: var(--serif-zh);
+    color: rgba(244, 236, 216, 0.92);
+    font-size: 18px;
+    font-weight: 500;
+    line-height: 1.4;
+    letter-spacing: 0.1em;
+    writing-mode: vertical-rl;
+    text-orientation: upright;
+    max-height: 80%;
+    overflow: hidden;
+  }
+  .book-cover::after {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 4px;
+    background: linear-gradient(90deg, rgba(0,0,0,0.25), transparent);
+    pointer-events: none;
+  }
+
+  .book-title {
+    font-family: var(--serif-zh);
+    font-size: 15px;
+    color: var(--ink);
+    font-weight: 500;
+    line-height: 1.4;
+    margin-bottom: 4px;
+  }
+  .book-author {
+    font-family: var(--serif-en);
+    font-style: italic;
+    font-size: 13px;
+    color: var(--ink-faint);
+  }
+
+  /* ============== 列表视图 ============== */
+  .list {
+    display: flex;
+    flex-direction: column;
+  }
+  .list-row {
+    display: grid;
+    grid-template-columns: 60px 2.5fr 1.5fr 1fr 0.8fr 1fr;
+    gap: 20px;
+    padding: 14px 8px;
+    border-bottom: 1px solid var(--line-soft);
+    cursor: pointer;
+    align-items: center;
+    transition: background .15s;
+  }
+  .list-row:hover { background: rgba(154, 123, 58, 0.06); }
+  .list-row.list-head {
+    cursor: default;
+    border-bottom: 2px solid var(--ink-soft);
+    font-size: 12px;
+    color: var(--ink-faint);
+    letter-spacing: 0.2em;
+    padding: 10px 8px;
+  }
+  .list-row.list-head:hover { background: transparent; }
+  .list-cover {
+    width: 44px;
+    height: 60px;
+    background: linear-gradient(135deg, #c0a878, #8a6f3f);
+    box-shadow: 2px 2px 6px rgba(0,0,0,0.15);
+    overflow: hidden;
+  }
+  .list-cover img { width: 100%; height: 100%; object-fit: cover; }
+  .list-title { font-weight: 500; }
+  .list-author, .list-publisher, .list-year, .list-tags {
+    font-size: 14px;
+    color: var(--ink-soft);
+  }
+  .list-tags {
+    font-family: var(--serif-en);
+    font-style: italic;
+    font-size: 13px;
+  }
+
+  /* ============== 空状态 ============== */
+  .empty {
+    text-align: center;
+    padding: 100px 20px;
+    color: var(--ink-faint);
+  }
+  .empty-mark {
+    font-family: var(--serif-zh);
+    font-size: 64px;
+    color: var(--line);
+    margin-bottom: 16px;
+    font-weight: 300;
+  }
+  .empty-text {
+    font-family: var(--serif-en);
+    font-style: italic;
+    font-size: 18px;
+    margin-bottom: 8px;
+  }
+  .empty-hint {
+    font-size: 14px;
+    color: var(--ink-faint);
+  }
+
+  /* ============== 弹窗 ============== */
+  .overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(42, 37, 32, 0.55);
+    backdrop-filter: blur(2px);
+    z-index: 100;
+    display: none;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 60px 20px;
+    overflow-y: auto;
+  }
+  .overlay.open { display: flex; }
+  .modal {
+    background: var(--paper);
+    border: 1px solid var(--ink-soft);
+    box-shadow: 12px 12px 0 rgba(42, 37, 32, 0.12);
+    max-width: 720px;
+    width: 100%;
+    padding: 0;
+    position: relative;
+    margin: auto;
+  }
+  .modal-head {
+    padding: 24px 32px 18px;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--paper-deep);
+  }
+  .modal-title {
+    font-size: 22px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+  }
+  .modal-title::before {
+    content: '';
+    display: inline-block;
+    width: 4px; height: 18px;
+    background: var(--vermilion);
+    margin-right: 12px;
+    transform: translateY(2px);
+  }
+  .modal-close {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: var(--ink-soft);
+    font-size: 24px;
+    line-height: 1;
+    padding: 4px 8px;
+  }
+  .modal-close:hover { color: var(--vermilion); }
+  .modal-body { padding: 28px 32px; }
+  .modal-foot {
+    padding: 18px 32px;
+    border-top: 1px solid var(--line);
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    background: var(--paper-deep);
+  }
+  .modal-foot-left {
+    margin-right: auto;
+  }
+
+  /* ============== 表单 ============== */
+  .form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px 24px;
+  }
+  .form-row { display: flex; flex-direction: column; gap: 6px; }
+  .form-row.full { grid-column: 1 / -1; }
+  .form-row label {
+    font-size: 12px;
+    color: var(--ink-soft);
+    letter-spacing: 0.2em;
+    font-weight: 500;
+  }
+  .form-row input, .form-row textarea, .form-row select {
+    padding: 8px 12px;
+    border: 1px solid var(--line);
+    background: rgba(255, 252, 244, 0.6);
+    font-family: var(--serif-zh);
+    font-size: 15px;
+    color: var(--ink);
+    outline: none;
+    transition: border-color .2s;
+  }
+  .form-row input:focus, .form-row textarea:focus, .form-row select:focus {
+    border-color: var(--vermilion);
+    background: rgba(255, 252, 244, 1);
+  }
+  .form-row textarea {
+    resize: vertical;
+    min-height: 80px;
+    font-family: var(--serif-zh);
+    line-height: 1.7;
+  }
+
+  /* Google Books 抓取条 */
+  .fetch-bar {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 22px;
+    padding: 14px;
+    background: rgba(107, 125, 110, 0.08);
+    border-left: 3px solid var(--celadon);
+    flex-wrap: wrap;
+  }
+  .fetch-bar input {
+    flex: 1;
+    min-width: 180px;
+    padding: 8px 12px;
+    border: 1px solid var(--line);
+    background: var(--paper);
+    font-family: var(--serif-zh);
+    font-size: 14px;
+    outline: none;
+  }
+  .fetch-bar input:focus { border-color: var(--celadon); }
+  .fetch-status {
+    font-size: 12px;
+    color: var(--ink-faint);
+    font-style: italic;
+    margin-top: 6px;
+  }
+  .fetch-status.error { color: var(--vermilion); }
+  .fetch-status.success { color: var(--celadon); }
+
+  /* 扫码按钮 */
+  .scan-btn {
+    padding: 8px 12px;
+    border: 1px solid var(--celadon);
+    background: var(--paper);
+    color: var(--celadon);
+    font-family: var(--serif-zh);
+    font-size: 13px;
+    cursor: pointer;
+    letter-spacing: 0.1em;
+    transition: all .2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .scan-btn:hover { background: var(--celadon); color: var(--paper); }
+  .scan-btn .scan-icon {
+    display: inline-block;
+    width: 14px; height: 14px;
+    border: 2px solid currentColor;
+    position: relative;
+  }
+  .scan-btn .scan-icon::before,
+  .scan-btn .scan-icon::after {
+    content: '';
+    position: absolute;
+    background: currentColor;
+  }
+  .scan-btn .scan-icon::before {
+    left: 1px; right: 1px;
+    top: 50%; height: 2px;
+    transform: translateY(-50%);
+  }
+
+  /* 扫码弹窗 */
+  .scanner-overlay {
+    position: fixed;
+    inset: 0;
+    background: #000;
+    z-index: 200;
+    display: none;
+    flex-direction: column;
+  }
+  .scanner-overlay.open { display: flex; }
+  .scanner-head {
+    padding: 16px 20px;
+    background: rgba(0,0,0,0.85);
+    color: var(--paper);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    z-index: 2;
+  }
+  .scanner-title {
+    font-family: var(--serif-zh);
+    font-size: 16px;
+    letter-spacing: 0.15em;
+  }
+  .scanner-close {
+    background: transparent;
+    border: 1px solid var(--paper);
+    color: var(--paper);
+    padding: 6px 16px;
+    font-family: var(--serif-zh);
+    font-size: 13px;
+    cursor: pointer;
+    letter-spacing: 0.1em;
+  }
+  .scanner-video-wrap {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    background: #000;
+  }
+  #scannerVideo {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  /* 取景框 */
+  .scanner-frame {
+    position: absolute;
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    width: 80%;
+    max-width: 360px;
+    aspect-ratio: 3 / 1.6;
+    border: 2px solid rgba(255,255,255,0.6);
+    box-shadow: 0 0 0 9999px rgba(0,0,0,0.5);
+    pointer-events: none;
+  }
+  .scanner-frame::before, .scanner-frame::after,
+  .scanner-frame > span::before, .scanner-frame > span::after {
+    content: '';
+    position: absolute;
+    width: 22px; height: 22px;
+    border: 3px solid var(--vermilion);
+  }
+  .scanner-frame::before { top: -3px; left: -3px; border-right: none; border-bottom: none; }
+  .scanner-frame::after { top: -3px; right: -3px; border-left: none; border-bottom: none; }
+  .scanner-frame > span::before { bottom: -3px; left: -3px; border-right: none; border-top: none; }
+  .scanner-frame > span::after { bottom: -3px; right: -3px; border-left: none; border-top: none; }
+
+  .scanner-laser {
+    position: absolute;
+    left: 0; right: 0;
+    height: 2px;
+    background: var(--vermilion);
+    box-shadow: 0 0 8px var(--vermilion);
+    animation: laser 2s ease-in-out infinite;
+  }
+  @keyframes laser {
+    0%, 100% { top: 10%; }
+    50% { top: 90%; }
+  }
+
+  .scanner-hint {
+    position: absolute;
+    bottom: 32px;
+    left: 0; right: 0;
+    text-align: center;
+    color: var(--paper);
+    font-family: var(--serif-zh);
+    font-size: 14px;
+    letter-spacing: 0.15em;
+    text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+    z-index: 2;
+  }
+  .scanner-error {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    color: var(--paper);
+    text-align: center;
+    padding: 40px;
+    background: rgba(0,0,0,0.9);
+    font-family: var(--serif-zh);
+  }
+  .scanner-error h3 {
+    font-size: 20px;
+    margin-bottom: 12px;
+    color: var(--vermilion-soft);
+  }
+  .scanner-error p {
+    font-size: 14px;
+    line-height: 1.7;
+    color: rgba(244, 236, 216, 0.85);
+    max-width: 320px;
+    margin-bottom: 16px;
+  }
+
+  /* ============== 详情视图 ============== */
+  .detail-grid {
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    gap: 32px;
+  }
+  .detail-cover {
+    width: 100%;
+    aspect-ratio: 2/3;
+    background: linear-gradient(135deg, #c0a878, #8a6f3f);
+    box-shadow: 6px 6px 16px rgba(0,0,0,0.15);
+    overflow: hidden;
+  }
+  .detail-cover img { width: 100%; height: 100%; object-fit: cover; }
+  .detail-info dt {
+    font-size: 11px;
+    color: var(--ink-faint);
+    letter-spacing: 0.25em;
+    margin-bottom: 4px;
+    margin-top: 14px;
+    font-weight: 500;
+  }
+  .detail-info dt:first-child { margin-top: 0; }
+  .detail-info dd {
+    font-size: 15px;
+    color: var(--ink);
+    padding-bottom: 8px;
+    border-bottom: 1px dotted var(--line-soft);
+  }
+  .detail-info dd.notes {
+    white-space: pre-wrap;
+    line-height: 1.85;
+    padding-top: 8px;
+    border-bottom: none;
+    font-style: italic;
+    color: var(--ink-soft);
+  }
+  .detail-headline {
+    font-size: 28px;
+    font-weight: 500;
+    line-height: 1.3;
+    margin-bottom: 6px;
+  }
+  .detail-subhead {
+    font-family: var(--serif-en);
+    font-style: italic;
+    color: var(--ink-soft);
+    font-size: 17px;
+    margin-bottom: 24px;
+  }
+
+  /* ============== 提示 ============== */
+  .toast {
+    position: fixed;
+    bottom: 32px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--ink);
+    color: var(--paper);
+    padding: 12px 24px;
+    font-size: 14px;
+    letter-spacing: 0.1em;
+    z-index: 200;
+    opacity: 0;
+    transition: all .3s;
+    pointer-events: none;
+  }
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  /* ============== 响应式 ============== */
+  @media (max-width: 720px) {
+    header { padding: 20px 20px 16px; }
+    main { padding: 24px 20px; }
+    .brand-mark { font-size: 30px; }
+    .header-tools { gap: 10px; width: 100%; justify-content: space-between; }
+    .search { width: 160px; }
+    .grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 24px 16px; }
+    .form-grid { grid-template-columns: 1fr; }
+    .detail-grid { grid-template-columns: 1fr; }
+    .detail-cover { max-width: 200px; margin: 0 auto; }
+    .list-row {
+      grid-template-columns: 50px 1fr 1fr;
+      font-size: 13px;
+    }
+    .list-row > :nth-child(n+4) { display: none; }
+    .modal-head, .modal-body, .modal-foot { padding-left: 20px; padding-right: 20px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <h1 class="brand-mark">书山</h1>
+    <span class="brand-sub">Bibliotheca Personalis</span>
+    <span class="brand-meta">藏 · 录 · 览</span>
+  </div>
+  <div class="header-tools">
+    <div class="search-wrap">
+      <span class="search-icon">⌕</span>
+      <input class="search" id="searchInput" type="text" placeholder="书名、作者、标签…">
+    </div>
+    <div class="view-toggle">
+      <button id="viewGrid" class="active">书架</button>
+      <button id="viewList">目录</button>
+    </div>
+    <button class="btn btn-primary" id="addBtn">＋ 入册</button>
+    <div class="menu-wrap">
+      <button class="btn btn-ghost" id="menuBtn">⋯</button>
+      <div class="menu" id="menu">
+        <button data-act="export-json">导出 · JSON 备份</button>
+        <button data-act="export-csv">导出 · CSV 表格</button>
+        <button data-act="export-md">导出 · Markdown 清单</button>
+        <button data-act="import">导入 · JSON 备份</button>
+        <button data-act="clear">清空全部藏书</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="stats-bar" id="statsBar">
+    <span class="stats-count"><strong id="bookCount">0</strong>卷</span>
+    <span id="statsHint">— et omnia in pulvere requiescunt.</span>
+  </div>
+  <div id="bookContainer"></div>
+</main>
+
+<!-- 编辑/添加弹窗 -->
+<div class="overlay" id="editOverlay">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title" id="editTitle">入册新书</div>
+      <button class="modal-close" data-close="editOverlay">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="fetch-bar">
+        <input type="text" id="fetchInput" placeholder="输入 ISBN 或书名，自动从 Google Books 拉取">
+        <button class="scan-btn" id="scanBtn" title="扫描 ISBN 条形码"><span class="scan-icon"></span>扫码</button>
+        <button class="btn" id="fetchBtn">查询</button>
+      </div>
+      <div class="fetch-status" id="fetchStatus"></div>
+      <form class="form-grid" id="bookForm" onsubmit="return false">
+        <div class="form-row full">
+          <label>书名 *</label>
+          <input type="text" name="title" required>
+        </div>
+        <div class="form-row">
+          <label>作者</label>
+          <input type="text" name="author">
+        </div>
+        <div class="form-row">
+          <label>译者</label>
+          <input type="text" name="translator">
+        </div>
+        <div class="form-row">
+          <label>ISBN</label>
+          <input type="text" name="isbn">
+        </div>
+        <div class="form-row">
+          <label>出版社</label>
+          <input type="text" name="publisher">
+        </div>
+        <div class="form-row">
+          <label>年份</label>
+          <input type="text" name="year">
+        </div>
+        <div class="form-row">
+          <label>页数</label>
+          <input type="number" name="pages">
+        </div>
+        <div class="form-row">
+          <label>标签 / 分类（逗号分隔）</label>
+          <input type="text" name="tags" placeholder="文学, 古典, 红楼">
+        </div>
+        <div class="form-row">
+          <label>位置（哪个书架）</label>
+          <input type="text" name="location" placeholder="客厅书架·第三层">
+        </div>
+        <div class="form-row full">
+          <label>封面图（URL 或上传）</label>
+          <input type="text" name="cover" id="coverUrl" placeholder="https://… 或留空">
+          <input type="file" name="coverFile" id="coverFile" accept="image/*" style="margin-top:6px;">
+        </div>
+        <div class="form-row full">
+          <label>备注</label>
+          <textarea name="notes" placeholder="题跋、读后感、版本异同……"></textarea>
+        </div>
+      </form>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost modal-foot-left" id="deleteBtn" style="display:none;">删除此卷</button>
+      <button class="btn" data-close="editOverlay">取消</button>
+      <button class="btn btn-primary" id="saveBtn">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 详情弹窗 -->
+<div class="overlay" id="detailOverlay">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title">书录</div>
+      <button class="modal-close" data-close="detailOverlay">×</button>
+    </div>
+    <div class="modal-body" id="detailBody"></div>
+    <div class="modal-foot">
+      <button class="btn" data-close="detailOverlay">关闭</button>
+      <button class="btn btn-primary" id="editFromDetail">编辑</button>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="importFile" accept=".json" style="display:none;">
+
+<!-- 扫码弹窗 -->
+<div class="scanner-overlay" id="scannerOverlay">
+  <div class="scanner-head">
+    <div class="scanner-title">扫描 ISBN 条形码</div>
+    <button class="scanner-close" id="scannerClose">关闭</button>
+  </div>
+  <div class="scanner-video-wrap">
+    <video id="scannerVideo" playsinline muted></video>
+    <div class="scanner-frame"><span></span></div>
+    <div class="scanner-laser"></div>
+    <div class="scanner-hint">将书背条形码对准取景框</div>
+    <div class="scanner-error" id="scannerError" style="display:none;"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ===========================================================
+   书山 — 数据层（IndexedDB）
+   =========================================================== */
+const DB_NAME = 'shushan';
+const DB_VERSION = 1;
+const STORE = 'books';
+
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = e => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(STORE)) {
+        db.createObjectStore(STORE, { keyPath: 'id' });
+      }
+    };
+    req.onsuccess = e => resolve(e.target.result);
+    req.onerror = e => reject(e.target.error);
+  });
+}
+
+async function dbAll() {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readonly');
+    const req = tx.objectStore(STORE).getAll();
+    req.onsuccess = () => resolve(req.result || []);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function dbPut(book) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    tx.objectStore(STORE).put(book);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+async function dbDel(id) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    tx.objectStore(STORE).delete(id);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+async function dbClear() {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    tx.objectStore(STORE).clear();
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+/* ===========================================================
+   状态
+   =========================================================== */
+let books = [];
+let view = 'grid';
+let searchQuery = '';
+let editingId = null;
+
+/* ===========================================================
+   渲染
+   =========================================================== */
+const $ = sel => document.querySelector(sel);
+const container = $('#bookContainer');
+
+function escapeHTML(str) {
+  if (str == null) return '';
+  return String(str).replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+}
+
+function filteredBooks() {
+  const q = searchQuery.trim().toLowerCase();
+  let list = books;
+  if (q) {
+    list = books.filter(b => {
+      const hay = [
+        b.title, b.author, b.translator, b.publisher,
+        b.notes, b.tags, b.location, b.isbn, b.year
+      ].filter(Boolean).join(' ').toLowerCase();
+      return hay.includes(q);
+    });
+  }
+  // 按入册时间倒序
+  return list.slice().sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0));
+}
+
+function render() {
+  const list = filteredBooks();
+  $('#bookCount').textContent = list.length;
+  $('#statsHint').textContent = books.length === 0
+    ? '— et omnia in pulvere requiescunt.'
+    : (searchQuery ? `（共 ${books.length} 卷，筛得 ${list.length} 卷）` : '— silentium aurum est.');
+
+  if (list.length === 0) {
+    container.innerHTML = `
+      <div class="empty">
+        <div class="empty-mark">${books.length === 0 ? '空' : '无'}</div>
+        <div class="empty-text">${books.length === 0 ? 'Tabula rasa.' : 'Nihil inventum.'}</div>
+        <div class="empty-hint">${books.length === 0 ? '点击「入册」开始你的藏书录。' : '换个关键词试试。'}</div>
+      </div>`;
+    return;
+  }
+
+  if (view === 'grid') renderGrid(list);
+  else renderList(list);
+}
+
+function renderGrid(list) {
+  container.className = 'grid';
+  container.innerHTML = list.map(b => `
+    <div class="book-card" data-id="${b.id}">
+      <div class="book-cover ${b.cover ? '' : 'no-image'}">
+        ${b.cover
+          ? `<img src="${escapeHTML(b.cover)}" alt="${escapeHTML(b.title)}" onerror="this.parentElement.classList.add('no-image');this.outerHTML='<div class=\\'placeholder-title\\'>${escapeHTML(b.title).replace(/'/g, '&apos;').slice(0, 6)}</div>'">`
+          : `<div class="placeholder-title">${escapeHTML(b.title.slice(0, 6))}</div>`}
+      </div>
+      <div class="book-title">${escapeHTML(b.title)}</div>
+      <div class="book-author">${escapeHTML(b.author || '佚名')}</div>
+    </div>
+  `).join('');
+}
+
+function renderList(list) {
+  container.className = 'list';
+  container.innerHTML = `
+    <div class="list-row list-head">
+      <div></div>
+      <div>书 名</div>
+      <div>作 者</div>
+      <div>出版社</div>
+      <div>年份</div>
+      <div>标 签</div>
+    </div>
+    ${list.map(b => `
+      <div class="list-row" data-id="${b.id}">
+        <div class="list-cover">
+          ${b.cover ? `<img src="${escapeHTML(b.cover)}" onerror="this.style.display='none'">` : ''}
+        </div>
+        <div class="list-title">${escapeHTML(b.title)}</div>
+        <div class="list-author">${escapeHTML(b.author || '—')}</div>
+        <div class="list-publisher">${escapeHTML(b.publisher || '—')}</div>
+        <div class="list-year">${escapeHTML(b.year || '—')}</div>
+        <div class="list-tags">${escapeHTML(b.tags || '')}</div>
+      </div>
+    `).join('')}
+  `;
+}
+
+container.addEventListener('click', e => {
+  const card = e.target.closest('[data-id]');
+  if (!card) return;
+  if (card.classList.contains('list-head')) return;
+  showDetail(card.dataset.id);
+});
+
+/* ===========================================================
+   详情
+   =========================================================== */
+function showDetail(id) {
+  const b = books.find(x => x.id === id);
+  if (!b) return;
+  editingId = id;
+  const body = $('#detailBody');
+  const tags = (b.tags || '').split(',').map(t => t.trim()).filter(Boolean);
+  body.innerHTML = `
+    <div class="detail-grid">
+      <div>
+        <div class="detail-cover ${b.cover ? '' : 'no-image'}" style="${b.cover ? '' : 'display:flex;align-items:center;justify-content:center;'}">
+          ${b.cover ? `<img src="${escapeHTML(b.cover)}" alt="" onerror="this.style.display='none'">` : ''}
+        </div>
+      </div>
+      <div class="detail-info">
+        <div class="detail-headline">${escapeHTML(b.title)}</div>
+        <div class="detail-subhead">${escapeHTML(b.author || '佚名')}${b.translator ? ' · 译 ' + escapeHTML(b.translator) : ''}</div>
+
+        ${b.publisher ? `<dt>出版社</dt><dd>${escapeHTML(b.publisher)}</dd>` : ''}
+        ${b.year ? `<dt>年份</dt><dd>${escapeHTML(b.year)}</dd>` : ''}
+        ${b.isbn ? `<dt>ISBN</dt><dd>${escapeHTML(b.isbn)}</dd>` : ''}
+        ${b.pages ? `<dt>页数</dt><dd>${escapeHTML(b.pages)} 页</dd>` : ''}
+        ${tags.length ? `<dt>标签</dt><dd>${tags.map(t => escapeHTML(t)).join(' · ')}</dd>` : ''}
+        ${b.location ? `<dt>位置</dt><dd>${escapeHTML(b.location)}</dd>` : ''}
+        ${b.notes ? `<dt>备注</dt><dd class="notes">${escapeHTML(b.notes)}</dd>` : ''}
+      </div>
+    </div>
+  `;
+  openOverlay('detailOverlay');
+}
+
+$('#editFromDetail').addEventListener('click', () => {
+  closeOverlay('detailOverlay');
+  openEditModal(editingId);
+});
+
+/* ===========================================================
+   编辑/新增
+   =========================================================== */
+function openEditModal(id) {
+  editingId = id;
+  const form = $('#bookForm');
+  form.reset();
+  $('#fetchStatus').textContent = '';
+  $('#fetchInput').value = '';
+  $('#coverFile').value = '';
+
+  if (id) {
+    const b = books.find(x => x.id === id);
+    if (b) {
+      $('#editTitle').textContent = '编辑书录';
+      $('#deleteBtn').style.display = 'inline-block';
+      Object.keys(b).forEach(k => {
+        const input = form.elements[k];
+        if (input) input.value = b[k] || '';
+      });
+    }
+  } else {
+    $('#editTitle').textContent = '入册新书';
+    $('#deleteBtn').style.display = 'none';
+  }
+  openOverlay('editOverlay');
+}
+
+$('#addBtn').addEventListener('click', () => openEditModal(null));
+
+$('#saveBtn').addEventListener('click', async () => {
+  const form = $('#bookForm');
+  const data = Object.fromEntries(new FormData(form).entries());
+  if (!data.title || !data.title.trim()) {
+    toast('书名不能为空');
+    return;
+  }
+
+  // 处理上传的封面文件
+  const fileInput = $('#coverFile');
+  if (fileInput.files && fileInput.files[0]) {
+    try {
+      data.cover = await fileToDataURL(fileInput.files[0]);
+    } catch (e) {
+      console.warn('封面读取失败', e);
+    }
+  }
+  delete data.coverFile;
+
+  let book;
+  if (editingId) {
+    book = books.find(x => x.id === editingId);
+    Object.assign(book, data);
+    book.updatedAt = Date.now();
+  } else {
+    book = {
+      ...data,
+      id: 'b_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+      addedAt: Date.now(),
+      updatedAt: Date.now()
+    };
+    books.push(book);
+  }
+  await dbPut(book);
+  closeOverlay('editOverlay');
+  render();
+  toast(editingId ? '已更新' : '已入册');
+  editingId = null;
+});
+
+$('#deleteBtn').addEventListener('click', async () => {
+  if (!editingId) return;
+  if (!confirm('确认删除此卷？此操作不可撤销。')) return;
+  await dbDel(editingId);
+  books = books.filter(x => x.id !== editingId);
+  closeOverlay('editOverlay');
+  render();
+  toast('已删除');
+  editingId = null;
+});
+
+function fileToDataURL(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result);
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+}
+
+/* ===========================================================
+   Google Books 抓取
+   =========================================================== */
+$('#fetchBtn').addEventListener('click', fetchFromGoogleBooks);
+$('#fetchInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); fetchFromGoogleBooks(); }
+});
+
+// Google Books API key（已限制 referrer，仅本网站可用）
+const GOOGLE_BOOKS_API_KEY = 'AIzaSyAfz-FkVmk_2hTgPba3ere9WOquOnl5wiw';
+
+async function fetchFromGoogleBooks() {
+  const q = $('#fetchInput').value.trim();
+  if (!q) return;
+  const status = $('#fetchStatus');
+  status.className = 'fetch-status';
+  status.textContent = '查询中…';
+
+  // 判断是 ISBN 还是文本
+  const cleaned = q.replace(/[-\s]/g, '');
+  const isISBN = /^\d{10}(\d{3})?$/.test(cleaned);
+  const baseQuery = isISBN
+    ? `q=isbn:${cleaned}`
+    : `q=${encodeURIComponent(q)}&maxResults=1`;
+  const url = `https://www.googleapis.com/books/v1/volumes?${baseQuery}&key=${GOOGLE_BOOKS_API_KEY}`;
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) {
+      // 不同状态码给不同提示
+      if (res.status === 429) {
+        throw new Error('请求过于频繁，稍后再试');
+      } else if (res.status === 403) {
+        throw new Error('API key 配额已用完或被限制');
+      } else if (res.status === 400) {
+        throw new Error('查询格式有误');
+      } else {
+        throw new Error(`服务器返回 ${res.status}`);
+      }
+    }
+    const data = await res.json();
+    if (!data.items || data.items.length === 0) {
+      status.classList.add('error');
+      status.textContent = isISBN
+        ? '未找到此 ISBN，可能是中文书或冷门书目。请手动填写。'
+        : '未找到匹配的书目。请手动填写或换个关键词。';
+      return;
+    }
+    const v = data.items[0].volumeInfo || {};
+    const form = $('#bookForm');
+    if (v.title) form.elements.title.value = v.title + (v.subtitle ? ' · ' + v.subtitle : '');
+    if (v.authors) form.elements.author.value = v.authors.join(', ');
+    if (v.publisher) form.elements.publisher.value = v.publisher;
+    if (v.publishedDate) form.elements.year.value = v.publishedDate.slice(0, 4);
+    if (v.pageCount) form.elements.pages.value = v.pageCount;
+    if (v.categories) form.elements.tags.value = v.categories.join(', ');
+    if (v.description) {
+      const cur = form.elements.notes.value;
+      if (!cur) form.elements.notes.value = v.description.slice(0, 400);
+    }
+    if (v.industryIdentifiers) {
+      const isbn = v.industryIdentifiers.find(x => x.type === 'ISBN_13')
+                 || v.industryIdentifiers.find(x => x.type === 'ISBN_10');
+      if (isbn) form.elements.isbn.value = isbn.identifier;
+    }
+    if (v.imageLinks) {
+      // 优先用清晰版；Google 有时给的是 http，转为 https
+      const img = v.imageLinks.large || v.imageLinks.medium || v.imageLinks.thumbnail || v.imageLinks.smallThumbnail;
+      if (img) form.elements.cover.value = img.replace(/^http:/, 'https:');
+    }
+    status.classList.add('success');
+    status.textContent = `已填入：${v.title}（请补充译者、位置等中文信息后保存）`;
+  } catch (e) {
+    status.classList.add('error');
+    status.textContent = '查询失败：' + e.message;
+  }
+}
+
+/* ===========================================================
+   扫码（ZXing）
+   =========================================================== */
+let codeReader = null;
+let scanStream = null;
+
+$('#scanBtn').addEventListener('click', startScanner);
+$('#scannerClose').addEventListener('click', stopScanner);
+
+async function startScanner() {
+  const overlay = $('#scannerOverlay');
+  const errorBox = $('#scannerError');
+  errorBox.style.display = 'none';
+  overlay.classList.add('open');
+
+  // 检查浏览器支持
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    showScannerError('此浏览器不支持摄像头', '请用 Safari（iOS）或 Chrome（Android）打开本页面。');
+    return;
+  }
+  if (typeof ZXing === 'undefined') {
+    showScannerError('扫码库加载失败', '请检查网络后重试，或手动输入 ISBN。');
+    return;
+  }
+
+  try {
+    // 获取摄像头流（优先后置）
+    scanStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' } },
+      audio: false
+    });
+    const video = $('#scannerVideo');
+    video.srcObject = scanStream;
+    await video.play();
+
+    // 启动 ZXing 解码
+    const hints = new Map();
+    const formats = [
+      ZXing.BarcodeFormat.EAN_13,
+      ZXing.BarcodeFormat.EAN_8,
+      ZXing.BarcodeFormat.UPC_A,
+      ZXing.BarcodeFormat.UPC_E,
+      ZXing.BarcodeFormat.CODE_128,
+    ];
+    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
+    hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+    codeReader = new ZXing.BrowserMultiFormatReader(hints);
+
+    codeReader.decodeFromVideoElement(video, (result, err) => {
+      if (result) {
+        const text = result.getText();
+        // 简单校验：13 位（EAN-13）或 10 位
+        const cleaned = text.replace(/[-\s]/g, '');
+        if (/^\d{10}(\d{3})?$/.test(cleaned)) {
+          onScanSuccess(cleaned);
+        }
+        // 不是 ISBN 就忽略，继续扫
+      }
+      // err 大多数是「这一帧没识别到」，无视即可
+    });
+  } catch (e) {
+    let msg = '请允许使用摄像头，并刷新页面重试。';
+    if (e.name === 'NotAllowedError') {
+      msg = '摄像头权限被拒绝。请到浏览器设置里允许此网站使用摄像头，再刷新重试。';
+    } else if (e.name === 'NotFoundError') {
+      msg = '未找到摄像头设备。';
+    } else if (e.name === 'NotReadableError') {
+      msg = '摄像头被其他应用占用。';
+    }
+    showScannerError('无法启动摄像头', msg);
+  }
+}
+
+function showScannerError(title, msg) {
+  const errorBox = $('#scannerError');
+  errorBox.innerHTML = `<h3>${title}</h3><p>${msg}</p><button class="scanner-close" onclick="stopScanner()">返回</button>`;
+  errorBox.style.display = 'flex';
+}
+
+function onScanSuccess(isbn) {
+  // 短促振动反馈（如果支持）
+  if (navigator.vibrate) navigator.vibrate(80);
+  stopScanner();
+  // 填入查询框并自动查询
+  $('#fetchInput').value = isbn;
+  toast('已扫到：' + isbn);
+  fetchFromGoogleBooks();
+}
+
+function stopScanner() {
+  $('#scannerOverlay').classList.remove('open');
+  if (codeReader) {
+    try { codeReader.reset(); } catch (e) {}
+    codeReader = null;
+  }
+  if (scanStream) {
+    scanStream.getTracks().forEach(t => t.stop());
+    scanStream = null;
+  }
+}
+window.stopScanner = stopScanner;
+
+/* ===========================================================
+   弹窗控制
+   =========================================================== */
+function openOverlay(id) { $('#' + id).classList.add('open'); }
+function closeOverlay(id) { $('#' + id).classList.remove('open'); }
+document.querySelectorAll('[data-close]').forEach(el => {
+  el.addEventListener('click', () => closeOverlay(el.dataset.close));
+});
+document.querySelectorAll('.overlay').forEach(o => {
+  o.addEventListener('click', e => { if (e.target === o) closeOverlay(o.id); });
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    document.querySelectorAll('.overlay.open').forEach(o => o.classList.remove('open'));
+    if ($('#scannerOverlay').classList.contains('open')) stopScanner();
+    $('#menu').classList.remove('open');
+  }
+});
+
+/* ===========================================================
+   视图切换 + 搜索
+   =========================================================== */
+$('#viewGrid').addEventListener('click', () => {
+  view = 'grid';
+  $('#viewGrid').classList.add('active');
+  $('#viewList').classList.remove('active');
+  render();
+});
+$('#viewList').addEventListener('click', () => {
+  view = 'list';
+  $('#viewList').classList.add('active');
+  $('#viewGrid').classList.remove('active');
+  render();
+});
+
+let searchTimer;
+$('#searchInput').addEventListener('input', e => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => {
+    searchQuery = e.target.value;
+    render();
+  }, 150);
+});
+
+/* ===========================================================
+   菜单 / 导入导出
+   =========================================================== */
+$('#menuBtn').addEventListener('click', e => {
+  e.stopPropagation();
+  $('#menu').classList.toggle('open');
+});
+document.addEventListener('click', () => $('#menu').classList.remove('open'));
+
+$('#menu').addEventListener('click', e => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  e.stopPropagation();
+  $('#menu').classList.remove('open');
+  const act = btn.dataset.act;
+  if (act === 'export-json') exportJSON();
+  else if (act === 'export-csv') exportCSV();
+  else if (act === 'export-md') exportMD();
+  else if (act === 'import') $('#importFile').click();
+  else if (act === 'clear') clearAll();
+});
+
+function downloadFile(name, content, mime) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function timestamp() {
+  const d = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}`;
+}
+
+function exportJSON() {
+  if (books.length === 0) { toast('暂无藏书可导出'); return; }
+  const payload = {
+    app: 'shushan',
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    books: books
+  };
+  downloadFile(`书山-${timestamp()}.json`, JSON.stringify(payload, null, 2), 'application/json');
+  toast('JSON 已导出');
+}
+
+function exportCSV() {
+  if (books.length === 0) { toast('暂无藏书可导出'); return; }
+  const cols = ['title','author','translator','publisher','year','pages','isbn','tags','location','notes'];
+  const headers = ['书名','作者','译者','出版社','年份','页数','ISBN','标签','位置','备注'];
+  const escape = v => {
+    if (v == null) return '';
+    const s = String(v).replace(/"/g, '""');
+    return /[",\n]/.test(s) ? `"${s}"` : s;
+  };
+  const rows = books.map(b => cols.map(c => escape(b[c])).join(','));
+  // 加 BOM 让 Excel 正确识别 UTF-8
+  const csv = '\ufeff' + headers.join(',') + '\n' + rows.join('\n');
+  downloadFile(`书山-${timestamp()}.csv`, csv, 'text/csv;charset=utf-8');
+  toast('CSV 已导出');
+}
+
+function exportMD() {
+  if (books.length === 0) { toast('暂无藏书可导出'); return; }
+  const lines = [];
+  lines.push(`# 书山 · 藏书清单`);
+  lines.push('');
+  lines.push(`> 导出于 ${new Date().toLocaleString('zh-CN')}　共 ${books.length} 卷`);
+  lines.push('');
+  lines.push('---');
+  lines.push('');
+  // 按作者分组
+  const sorted = books.slice().sort((a, b) => (a.title || '').localeCompare(b.title || '', 'zh-Hans-CN'));
+  sorted.forEach(b => {
+    lines.push(`## 《${b.title || '佚名'}》`);
+    lines.push('');
+    const meta = [];
+    if (b.author) meta.push(`**作者**：${b.author}`);
+    if (b.translator) meta.push(`**译者**：${b.translator}`);
+    if (b.publisher) meta.push(`**出版社**：${b.publisher}`);
+    if (b.year) meta.push(`**年份**：${b.year}`);
+    if (b.pages) meta.push(`**页数**：${b.pages}`);
+    if (b.isbn) meta.push(`**ISBN**：${b.isbn}`);
+    if (b.tags) meta.push(`**标签**：${b.tags}`);
+    if (b.location) meta.push(`**位置**：${b.location}`);
+    lines.push(meta.join('　·　'));
+    if (b.notes) {
+      lines.push('');
+      lines.push('> ' + b.notes.replace(/\n/g, '\n> '));
+    }
+    lines.push('');
+  });
+  downloadFile(`书山-${timestamp()}.md`, lines.join('\n'), 'text/markdown;charset=utf-8');
+  toast('Markdown 已导出');
+}
+
+$('#importFile').addEventListener('change', async e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  try {
+    const text = await file.text();
+    const data = JSON.parse(text);
+    if (!data.books || !Array.isArray(data.books)) {
+      toast('文件格式不对');
+      return;
+    }
+    if (!confirm(`即将导入 ${data.books.length} 卷藏书。\n\n选择"确定"合并到现有藏书（同 ID 覆盖）。\n选择"取消"放弃。`)) return;
+    for (const b of data.books) {
+      if (!b.id) b.id = 'b_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+      await dbPut(b);
+    }
+    books = await dbAll();
+    render();
+    toast(`已导入 ${data.books.length} 卷`);
+  } catch (err) {
+    toast('导入失败：' + err.message);
+  }
+  e.target.value = '';
+});
+
+async function clearAll() {
+  if (books.length === 0) { toast('暂无藏书'); return; }
+  const word = prompt(`此操作将清空全部 ${books.length} 卷藏书，且不可撤销。\n请输入「清空」二字确认：`);
+  if (word !== '清空') { toast('已取消'); return; }
+  await dbClear();
+  books = [];
+  render();
+  toast('已清空');
+}
+
+/* ===========================================================
+   提示
+   =========================================================== */
+let toastTimer;
+function toast(msg) {
+  const el = $('#toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+/* ===========================================================
+   启动
+   =========================================================== */
+(async function init() {
+  try {
+    books = await dbAll();
+  } catch (e) {
+    console.error(e);
+    toast('数据加载失败，本地存储不可用');
+  }
+  render();
+})();
+
+/* PWA: 注册 service worker */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(err => {
+      console.warn('Service worker 注册失败：', err);
+    });
+  });
+}
+</script>
+</body>
+</html>
