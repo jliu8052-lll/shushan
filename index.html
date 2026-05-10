@@ -1326,27 +1326,25 @@ async function startScanner() {
   errorBox.style.display = 'none';
   overlay.classList.add('open');
 
-  // 调试日志：把每一步都显示到屏幕上
   const dbg = (msg) => {
     if (statusEl) {
-      const old = statusEl.textContent;
       statusEl.textContent = msg;
       statusEl.style.color = 'rgba(244,236,216,0.95)';
       statusEl.style.fontSize = '12px';
-      console.log('[扫码]', msg);
     }
+    console.log('[扫码]', msg);
   };
 
   dbg('① 检查浏览器支持…');
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    showScannerError('此浏览器不支持摄像头', '请用 Safari（iOS）或 Chrome（Android）打开本页面。');
+    showScannerError('此浏览器不支持摄像头', '请用 Safari（iOS）或 Chrome（Android）。');
     return;
   }
 
   dbg('② 检查 ZXing 库…');
   if (typeof ZXing === 'undefined') {
-    dbg('❌ ZXing 未定义 — 库未加载');
-    showScannerError('扫码库加载失败', '可能是网络问题导致 ZXing 没下载。请检查网络后强制刷新（长按刷新按钮）重试，或手动输入 ISBN。');
+    dbg('❌ ZXing 未定义');
+    showScannerError('扫码库加载失败', '可能是网络问题。请检查网络后强制刷新重试。');
     return;
   }
   dbg('✅ ZXing 已加载');
@@ -1354,14 +1352,10 @@ async function startScanner() {
   try {
     dbg('③ 请求摄像头权限…');
     scanStream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: { ideal: 'environment' },
-        width: { ideal: 1920 },
-        height: { ideal: 1080 }
-      },
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
       audio: false
     });
-    dbg('④ 摄像头已开启，启动视频流…');
+    dbg('④ 摄像头开启…');
 
     const video = $('#scannerVideo');
     video.srcObject = scanStream;
@@ -1369,15 +1363,11 @@ async function startScanner() {
     dbg('⑤ 视频流播放中，初始化 ZXing…');
 
     const hints = new Map();
-    const formats = [
-      ZXing.BarcodeFormat.EAN_13,
-      ZXing.BarcodeFormat.EAN_8,
-      ZXing.BarcodeFormat.UPC_A,
-      ZXing.BarcodeFormat.UPC_E,
-      ZXing.BarcodeFormat.CODE_128,
-      ZXing.BarcodeFormat.CODE_39,
-    ];
-    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
+    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+      ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.EAN_8,
+      ZXing.BarcodeFormat.UPC_A, ZXing.BarcodeFormat.UPC_E,
+      ZXing.BarcodeFormat.CODE_128, ZXing.BarcodeFormat.CODE_39
+    ]);
     hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
 
     if (!ZXing.BrowserMultiFormatReader) {
@@ -1385,7 +1375,7 @@ async function startScanner() {
       return;
     }
     codeReader = new ZXing.BrowserMultiFormatReader(hints);
-    dbg('⑥ ZXing 初始化完成，开始扫描…');
+    dbg('⑥ ZXing 初始化完成');
 
     let frameCount = 0;
     scanStartTime = Date.now();
@@ -1396,35 +1386,27 @@ async function startScanner() {
       const now = Date.now();
       if (now - lastUiUpdate > 800) {
         const seconds = (now - scanStartTime) / 1000;
-        const fps = (frameCount / seconds).toFixed(1);
-        dbg(`⏳ 已扫 ${frameCount} 帧 / ${seconds.toFixed(1)}秒 (${fps} fps)`);
+        dbg(`⏳ 已扫 ${frameCount} 帧 / ${seconds.toFixed(1)}秒 (${(frameCount/seconds).toFixed(1)} fps)`);
         lastUiUpdate = now;
       }
       if (result) {
         const text = result.getText();
         const cleaned = text.replace(/[-\s]/g, '');
         dbg('✅ 识别到: ' + text);
-        if (/^\d{10}(\d{3})?$/.test(cleaned)) {
-          onScanSuccess(cleaned);
-        }
+        if (/^\d{10}(\d{3})?$/.test(cleaned)) onScanSuccess(cleaned);
       }
     });
     dbg('⑦ 扫描已启动，对准条形码…');
   } catch (e) {
     dbg('❌ 出错: ' + (e.name || '') + ' / ' + (e.message || ''));
-    let msg = '请允许使用摄像头，并刷新页面重试。';
-    if (e.name === 'NotAllowedError') {
-      msg = '摄像头权限被拒绝。iPhone 上请到「设置 → Safari → 摄像头」中允许此网站。';
-    } else if (e.name === 'NotFoundError') {
-      msg = '未找到摄像头设备。';
-    } else if (e.name === 'NotReadableError') {
-      msg = '摄像头被其他应用占用。';
-    }
+    let msg = '请允许使用摄像头并刷新重试。';
+    if (e.name === 'NotAllowedError') msg = '摄像头权限被拒绝。设置 → Safari → 摄像头 中允许此站。';
+    else if (e.name === 'NotFoundError') msg = '未找到摄像头设备。';
+    else if (e.name === 'NotReadableError') msg = '摄像头被其他应用占用。';
     showScannerError('无法启动摄像头', msg);
   }
 }
 let scanStartTime = 0;
-
 function showScannerError(title, msg) {
   const errorBox = $('#scannerError');
   errorBox.innerHTML = `<h3>${title}</h3><p>${msg}</p><button class="scanner-close" onclick="stopScanner()">返回</button>`;
